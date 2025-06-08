@@ -1,0 +1,12 @@
+﻿{
+  "$schema": "https://gitlab.com/vtolvr-mods/ModLoader/-/raw/release/schema.json",
+  "Description": "Estimates radar detection range based upon recieved radar signals.",
+  "MetaData": {
+    "DllName": "DetectionRangeEstimation.dll",
+    "AllowLoadOnStart": true,
+    "ShowOnMainList": true,
+    "DllHash": ""
+  },
+  "PreviewImageUrl": "https://vtolvr-mods.com/static/img/Logo.png",
+  "Title": "DetectionRangeEstimation"
+}
