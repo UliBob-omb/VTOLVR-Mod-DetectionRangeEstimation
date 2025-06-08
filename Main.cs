@@ -14,6 +14,7 @@ using UnityEngine.SceneManagement;
  * -check if player death creates any bugs
  * -check to see if new readonly on _RCS1Range causes any issues
  * -display these stats in nm *somewhere* in-game (kneeboard? New MFD screen?)
+ * --study MFDs in all planes to determine best approach
  * 
  */
 
@@ -59,24 +60,24 @@ namespace DetectionRangeEstimation
         private int _eqNumToJett = 0;
 
         private List<Vector3> _returnDirections = [];
-        private readonly Dictionary<string, float> _RCS1Range = new() {{ "FA-26B",    04.27f },
-                                                              { "AV-42",     00.00f },
-                                                              { "F-45A",     04.68f },
-                                                              { "AH-94",     00.00f },
-                                                              { "T-55",      03.87f },
-                                                              { "EF-24",     04.95f },
-                                                              { "AWACS",     18.70f },
-                                                              { "EW Rdr",    22.59f },
-                                                              { "MAD-4",     04.83f },
-                                                              { "NMSSLR",    04.68f },
-                                                              { "ASF-58",    04.09f },
-                                                              { "SAM SA",    04.09f },
-                                                              { "ASF-30/33", 03.91f },
-                                                              { "Mbl Rdr",   03.72f },
-                                                              { "Cruiser",   03.38f },
-                                                              { "NMSSVrt",   03.05f },
-                                                              { "RFrCtrl",   03.05f },
-                                                              { "BFrCtrl",   02.86f }};
+        private readonly Dictionary<string, float> _RCS1Range = new() { { "FA-26B",    04.27f },
+                                                                        { "AV-42",     00.00f },
+                                                                        { "F-45A",     04.68f },
+                                                                        { "AH-94",     00.00f },
+                                                                        { "T-55",      03.87f },
+                                                                        { "EF-24",     04.95f },
+                                                                        { "AWACS",     18.70f },
+                                                                        { "EW Rdr",    22.59f },
+                                                                        { "MAD-4",     04.83f },
+                                                                        { "NMSSLR",    04.68f },
+                                                                        { "ASF-58",    04.09f },
+                                                                        { "SAM SA",    04.09f },
+                                                                        { "ASF-30/33", 03.91f },
+                                                                        { "Mbl Rdr",   03.72f },
+                                                                        { "Cruiser",   03.38f },
+                                                                        { "NMSSVrt",   03.05f },
+                                                                        { "RFrCtrl",   03.05f },
+                                                                        { "BFrCtrl",   02.86f }};
         public Dictionary<string, List<float>> _detectionRange = new() {{ "FA-26B",    [0f,0f,0f,0f,0f,0f] }, 
                                                                         { "AV-42",     [0f,0f,0f,0f,0f,0f] }, 
                                                                         { "F-45A",     [0f,0f,0f,0f,0f,0f] }, 
