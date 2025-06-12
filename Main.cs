@@ -6,6 +6,9 @@ using System.IO;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using HarmonyLib;
+using System.Runtime.CompilerServices;
+using System.Diagnostics.Eventing.Reader;
 
 /*
  * TODO:
@@ -15,6 +18,9 @@ using UnityEngine.SceneManagement;
  * -check to see if new readonly on _RCS1Range causes any issues
  * -display these stats in nm *somewhere* in-game (kneeboard? New MFD screen?)
  * --study MFDs in all planes to determine best approach
+ * --display stats in new mfd page, initializing with new gameobject.
+ * --be able to config opfor radar
+ * --make event for config button press
  * 
  */
 
@@ -78,11 +84,11 @@ namespace DetectionRangeEstimation
                                                                         { "NMSSVrt",   03.05f },
                                                                         { "RFrCtrl",   03.05f },
                                                                         { "BFrCtrl",   02.86f }};
-        public Dictionary<string, List<float>> _detectionRange = new() {{ "FA-26B",    [0f,0f,0f,0f,0f,0f] }, 
-                                                                        { "AV-42",     [0f,0f,0f,0f,0f,0f] }, 
-                                                                        { "F-45A",     [0f,0f,0f,0f,0f,0f] }, 
-                                                                        { "AH-94",     [0f,0f,0f,0f,0f,0f] }, 
-                                                                        { "T-55",      [0f,0f,0f,0f,0f,0f] }, 
+        public Dictionary<string, List<float>> _detectionRange = new() {{ "FA-26B",    [0f,0f,0f,0f,0f,0f] },
+                                                                        { "AV-42",     [0f,0f,0f,0f,0f,0f] },
+                                                                        { "F-45A",     [0f,0f,0f,0f,0f,0f] },
+                                                                        { "AH-94",     [0f,0f,0f,0f,0f,0f] },
+                                                                        { "T-55",      [0f,0f,0f,0f,0f,0f] },
                                                                         { "EF-24",     [0f,0f,0f,0f,0f,0f] },
                                                                         { "AWACS",     [0f,0f,0f,0f,0f,0f] },
                                                                         { "EW Rdr",    [0f,0f,0f,0f,0f,0f] },
@@ -97,16 +103,38 @@ namespace DetectionRangeEstimation
                                                                         { "RFrCtrl",   [0f,0f,0f,0f,0f,0f] },
                                                                         { "BFrCtrl",   [0f,0f,0f,0f,0f,0f] }};
 
+        public MFDPortalManager mfdPMngr = null;
+        public MFDManager mfdMngr = null;
+        private Object prefabRef;
+        public GameObject distPagePrefab;
+        public MFDPage distPage = null;
+
+
+
+
         private void Awake()
         {
             ModFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             Log($"Detection Range Estimation Awake at {ModFolder}");
 
+            prefabRef = Resources.Load(ModFolder + "\\DetectionRangeEstimation\\rdrdtctdistpage");
+            if (prefabRef == null)
+            {
+                LogError($"Prefab could not be loaded!");
+            }
+            else
+            {
+                
+            }
+
             SceneManager.activeSceneChanged += OnSceneChange;
             SceneManager.sceneLoaded += OnSceneLoaded;
             TargetManager.instance.OnRegisteredActor += OnRegisteredActor;
             TargetManager.instance.OnUnregisteredActor += OnUnregisteredActor;
+
+            
         }
+
         private void Update()
         {
             if (_playerActor == null)
@@ -129,6 +157,7 @@ namespace DetectionRangeEstimation
                 }
                 _recalcNeeded = false;
                 CalcDtctnDist();
+                // update page text with event
             }
         }
 
@@ -146,6 +175,8 @@ namespace DetectionRangeEstimation
                 _recalcNeeded = false;
                 _commsPage.OnRequestingRearming -= OnRearmRequest;
                 _commsPage = null;
+                mfdPMngr = null;
+                mfdMngr = null;
                 _playerActor.weaponManager.OnEquipGBroke -= OnEquipGBroke;
                 _playerActor.weaponManager.OnFiredMissile -= OnFiredMissile;
                 _playerActor.weaponManager.OnJettisonedEq -= OnJettisonedEq;
@@ -169,14 +200,22 @@ namespace DetectionRangeEstimation
             {
                 Log($"{actor.actorName} is player {_currentPilot.pilotName}, initializing...");
                 _playerActor = actor;
+
                 _playerActor.weaponManager.OnJettisonedEq += OnJettisonedEq;
                 _playerActor.weaponManager.OnEquipJettisonChanged += OnEquipJettisonChanged;
                 _playerActor.weaponManager.OnFiredMissile += OnFiredMissile;
                 _playerActor.weaponManager.OnEquipGBroke += OnEquipGBroke;
                 _playerActor.weaponManager.OnWeaponChanged.AddListener(OnWeaponChanged);
                 _playerActor.weaponManager.OnEndFire += OnEndFire;
+
                 _commsPage = _playerActor.GetComponentInChildren<MFDCommsPage>();
                 _commsPage.OnRequestingRearming += OnRearmRequest;
+                Log($"...Events initialized...");
+
+                mfdPMngr = _playerActor.GetComponentInChildren<MFDPortalManager>();
+                mfdMngr = _playerActor.GetComponentInChildren<MFDManager>();
+                Log($"...MFD manager found...");
+
                 _recalcNeeded = true;
                 Log($"...player actor initialization done.");
                 Log($"{_playerActor.actorName} has been registered, recalculation needed.");
@@ -192,6 +231,9 @@ namespace DetectionRangeEstimation
         {
             Log($"First weapon changed event after spawn or rearm, recalculation needed.");
             _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
+
+            InitMFDPage();
+
             _recalcNeeded = true;
         }
         private void OnJettisonedEq(HPEquippable equippable)
@@ -290,11 +332,46 @@ namespace DetectionRangeEstimation
             }
             Log($"Detection distance calculations done.");
         }
+        private void InitMFDPage()
+        {
+            if (mfdMngr == null & mfdPMngr == null)
+            {
+                LogError($"No MFD Manager found in player actor!");
+                return;
+            }
+            if (mfdMngr)
+            {
+                switch (_playerActor.name)
+                {
+                    case "SEVTF":
+                        //F-45
+                        break;
+                    default:
+                        LogError($"Vehicle is not in list of supported vehicles!");
+                        break;
+
+                }
+                distPagePrefab = Instantiate(prefabRef) as GameObject;
+                distPagePrefab.transform.parent = mfdMngr.transform;
+                mfdMngr.pagesDic = null;
+                mfdMngr.EnsureReady();
+            }
+            else if (mfdPMngr)
+            {
+                LogWarn($"MFD portals not yet supported!");
+            }
+        }
 
         public override void UnLoad()
         {
             // Destroy any objects
-
+            distPage = null;
+            
         }
+    }
+
+    public class TextUpdater : MonoBehaviour
+    {
+        
     }
 }
