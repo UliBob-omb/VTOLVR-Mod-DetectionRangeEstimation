@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using System.Diagnostics.Eventing.Reader;
+using System;
 
 /*
  * TODO:
@@ -105,26 +106,25 @@ namespace DetectionRangeEstimation
 
         public MFDPortalManager mfdPMngr = null;
         public MFDManager mfdMngr = null;
-        private Object prefabRef;
-        public GameObject distPagePrefab;
-        public MFDPage distPage = null;
-
-
-
+        private UnityEngine.Object MFDpgPrefabRef;
+        private UnityEngine.Object MFDPpgPrefabRef;
+        public GameObject distPgInstance;
+        public GameObject distPortPgInstance;
 
         private void Awake()
         {
             ModFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             Log($"Detection Range Estimation Awake at {ModFolder}");
 
-            prefabRef = Resources.Load(ModFolder + "\\DetectionRangeEstimation\\rdrdtctdistpage");
-            if (prefabRef == null)
+            MFDpgPrefabRef = Resources.Load(ModFolder + "\\rdrdtctdistpage");
+            MFDPpgPrefabRef = Resources.Load(ModFolder + "\\rdrdtctdistportal");
+            if (MFDpgPrefabRef == null)
             {
-                LogError($"Prefab could not be loaded!");
+                LogError($"MFD Page Prefab could not be loaded!");
             }
-            else
+            if (MFDPpgPrefabRef == null)
             {
-                
+                LogError($"MFD Portal Page Prefab could not be loaded!");
             }
 
             SceneManager.activeSceneChanged += OnSceneChange;
@@ -163,7 +163,7 @@ namespace DetectionRangeEstimation
 
         private void OnUnregisteredActor(Actor actor)
         {
-            Log($"Actor unregistered: {actor.name}");
+            //Log($"Actor unregistered: {actor.name}");
             if (_currentPilot == null)
             {
                 return;
@@ -173,10 +173,7 @@ namespace DetectionRangeEstimation
             {
                 Log($"Player actor {_playerActor.actorName} unregistered, deinitializing...");
                 _recalcNeeded = false;
-                _commsPage.OnRequestingRearming -= OnRearmRequest;
-                _commsPage = null;
-                mfdPMngr = null;
-                mfdMngr = null;
+
                 _playerActor.weaponManager.OnEquipGBroke -= OnEquipGBroke;
                 _playerActor.weaponManager.OnFiredMissile -= OnFiredMissile;
                 _playerActor.weaponManager.OnJettisonedEq -= OnJettisonedEq;
@@ -184,13 +181,20 @@ namespace DetectionRangeEstimation
                 if(_playerActor.weaponManager.OnWeaponChanged.HasListeners())
                     _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
                 _playerActor.weaponManager.OnEndFire -= OnEndFire;
+
+                _commsPage.OnRequestingRearming -= OnRearmRequest;
+                _commsPage = null;
+
+                mfdPMngr = null;
+                mfdMngr = null;
+
                 _playerActor = null;
                 Log($"...player actor deinitialized.");
             }
         }
         private void OnRegisteredActor(Actor actor)
         {
-            Log($"Actor registered: {actor.name} with root actor {actor.rootActor.name}");
+            //Log($"Actor registered: {actor.name} with root actor {actor.rootActor.name}");
             if (_currentPilot == null)
             {
                 return;
@@ -214,6 +218,7 @@ namespace DetectionRangeEstimation
 
                 mfdPMngr = _playerActor.GetComponentInChildren<MFDPortalManager>();
                 mfdMngr = _playerActor.GetComponentInChildren<MFDManager>();
+                InitMFDPage(); // might work here
                 Log($"...MFD manager found...");
 
                 _recalcNeeded = true;
@@ -232,7 +237,7 @@ namespace DetectionRangeEstimation
             Log($"First weapon changed event after spawn or rearm, recalculation needed.");
             _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
 
-            InitMFDPage();
+            //InitMFDPage(); // may need to move to actor registration section
 
             _recalcNeeded = true;
         }
@@ -339,34 +344,77 @@ namespace DetectionRangeEstimation
                 LogError($"No MFD Manager found in player actor!");
                 return;
             }
+
+            string actorName = _playerActor.actorName;
+            string pilotName = $" ({_currentPilot.pilotName})";
+            string vehicleName = actorName.Substring(0, actorName.Length - pilotName.Length);
+            Log($"Player's vehicle name is {vehicleName}.");
+
+            switch (vehicleName)
+            {
+                case "SEVTF":
+                    //F-45
+                    distPortPgInstance = Instantiate(MFDPpgPrefabRef) as GameObject;
+                    distPortPgInstance.transform.parent = mfdPMngr.transform.Find("poweredObj");
+                    distPortPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "FA-26B":
+                    //F/A-26B
+                    distPgInstance = Instantiate(MFDpgPrefabRef) as GameObject;
+                    distPgInstance.transform.parent = mfdMngr.transform;
+                    distPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "VTOL4":
+                    //AV-42C
+                    distPgInstance = Instantiate(MFDpgPrefabRef) as GameObject;
+                    distPgInstance.transform.parent = mfdMngr.transform;
+                    distPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "T-55":
+                    //T-55
+                    distPgInstance = Instantiate(MFDpgPrefabRef) as GameObject;
+                    distPgInstance.transform.parent = mfdMngr.transform;
+                    distPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "AH-94":
+                    //AH-94
+                    distPgInstance = Instantiate(MFDpgPrefabRef) as GameObject;
+                    distPgInstance.transform.parent = mfdMngr.transform;
+                    distPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "EF-24":
+                    //EF-24G
+                    distPortPgInstance = Instantiate(MFDPpgPrefabRef) as GameObject;
+                    distPortPgInstance.transform.parent = mfdPMngr.transform.Find("poweredObj").Find("-- pages --");
+                    distPortPgInstance.transform.SetAsLastSibling();
+                    break;
+                default:
+                    LogError($"Vehicle {_playerActor.name} is not in list of supported vehicles!");
+                    break;
+            }
+
             if (mfdMngr)
             {
-                switch (_playerActor.name)
-                {
-                    case "SEVTF":
-                        //F-45
-                        break;
-                    default:
-                        LogError($"Vehicle is not in list of supported vehicles!");
-                        break;
-
-                }
-                distPagePrefab = Instantiate(prefabRef) as GameObject;
-                distPagePrefab.transform.parent = mfdMngr.transform;
                 mfdMngr.pagesDic = null;
                 mfdMngr.EnsureReady();
             }
             else if (mfdPMngr)
             {
-                LogWarn($"MFD portals not yet supported!");
+                mfdPMngr.pages.Add(distPortPgInstance.GetComponent<MFDPortalPage>());
+                mfdPMngr.Start(); // Might not work since it's meant to be a private method
             }
         }
 
         public override void UnLoad()
         {
             // Destroy any objects
-            distPage = null;
-            
+            MFDpgPrefabRef = null;
+            MFDPpgPrefabRef = null;
+
+            SceneManager.activeSceneChanged -= OnSceneChange;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            TargetManager.instance.OnRegisteredActor -= OnRegisteredActor;
+            TargetManager.instance.OnUnregisteredActor -= OnUnregisteredActor;
         }
     }
 
