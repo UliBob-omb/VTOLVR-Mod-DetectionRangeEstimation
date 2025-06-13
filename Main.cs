@@ -10,6 +10,9 @@ using HarmonyLib;
 using System.Runtime.CompilerServices;
 using System.Diagnostics.Eventing.Reader;
 using System;
+using UnityEngine.Events;
+using UnityEngine.UI;
+using System.Collections.ObjectModel;
 
 /*
  * TODO:
@@ -22,7 +25,6 @@ using System;
  * --display stats in new mfd page, initializing with new gameobject.
  * --be able to config opfor radar
  * --make event for config button press
- * 
  */
 
 /* RCS process:
@@ -103,11 +105,13 @@ namespace DetectionRangeEstimation
                                                                         { "NMSSVrt",   [0f,0f,0f,0f,0f,0f] },
                                                                         { "RFrCtrl",   [0f,0f,0f,0f,0f,0f] },
                                                                         { "BFrCtrl",   [0f,0f,0f,0f,0f,0f] }};
+        public int currentRdr = 0;
+        private bool _isPortal = false;
 
         public MFDPortalManager mfdPMngr = null;
         public MFDManager mfdMngr = null;
-        private UnityEngine.Object MFDpgPrefabRef;
-        private UnityEngine.Object MFDPpgPrefabRef;
+        private AssetBundle MFDpgPrefabRef;
+        private AssetBundle MFDPpgPrefabRef;
         public GameObject distPgInstance;
         public GameObject distPortPgInstance;
 
@@ -116,8 +120,8 @@ namespace DetectionRangeEstimation
             ModFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             Log($"Detection Range Estimation Awake at {ModFolder}");
 
-            MFDpgPrefabRef = Resources.Load(ModFolder + "\\rdrdtctdistpage");
-            MFDPpgPrefabRef = Resources.Load(ModFolder + "\\rdrdtctdistportal");
+            MFDpgPrefabRef = AssetBundle.LoadFromFile($"{ModFolder}\\rdrdtctdistpage");
+            MFDPpgPrefabRef = AssetBundle.LoadFromFile($"{ModFolder}\\rdrdtctdistportal");
             if (MFDpgPrefabRef == null)
             {
                 LogError($"MFD Page Prefab could not be loaded!");
@@ -354,37 +358,37 @@ namespace DetectionRangeEstimation
             {
                 case "SEVTF":
                     //F-45
-                    distPortPgInstance = Instantiate(MFDPpgPrefabRef) as GameObject;
+                    distPortPgInstance = MFDPpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal");
                     distPortPgInstance.transform.parent = mfdPMngr.transform.Find("poweredObj");
                     distPortPgInstance.transform.SetAsLastSibling();
                     break;
                 case "FA-26B":
                     //F/A-26B
-                    distPgInstance = Instantiate(MFDpgPrefabRef) as GameObject;
+                    distPgInstance = MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage");
                     distPgInstance.transform.parent = mfdMngr.transform;
                     distPgInstance.transform.SetAsLastSibling();
                     break;
                 case "VTOL4":
                     //AV-42C
-                    distPgInstance = Instantiate(MFDpgPrefabRef) as GameObject;
+                    distPgInstance = MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage");
                     distPgInstance.transform.parent = mfdMngr.transform;
                     distPgInstance.transform.SetAsLastSibling();
                     break;
                 case "T-55":
                     //T-55
-                    distPgInstance = Instantiate(MFDpgPrefabRef) as GameObject;
+                    distPgInstance = MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage");
                     distPgInstance.transform.parent = mfdMngr.transform;
                     distPgInstance.transform.SetAsLastSibling();
                     break;
                 case "AH-94":
                     //AH-94
-                    distPgInstance = Instantiate(MFDpgPrefabRef) as GameObject;
+                    distPgInstance = MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage");
                     distPgInstance.transform.parent = mfdMngr.transform;
                     distPgInstance.transform.SetAsLastSibling();
                     break;
                 case "EF-24":
                     //EF-24G
-                    distPortPgInstance = Instantiate(MFDPpgPrefabRef) as GameObject;
+                    distPortPgInstance = MFDPpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal");
                     distPortPgInstance.transform.parent = mfdPMngr.transform.Find("poweredObj").Find("-- pages --");
                     distPortPgInstance.transform.SetAsLastSibling();
                     break;
@@ -408,8 +412,8 @@ namespace DetectionRangeEstimation
         public override void UnLoad()
         {
             // Destroy any objects
-            MFDpgPrefabRef = null;
-            MFDPpgPrefabRef = null;
+            MFDpgPrefabRef.Unload(true);
+            MFDPpgPrefabRef.Unload(true);
 
             SceneManager.activeSceneChanged -= OnSceneChange;
             SceneManager.sceneLoaded -= OnSceneLoaded;
