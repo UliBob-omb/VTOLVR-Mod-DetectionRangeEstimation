@@ -69,6 +69,8 @@ namespace DetectionRangeEstimation
         private int _eqNumToJett = 0;
 
         private List<Vector3> _returnDirections = [];
+        private readonly List<string> _radarNames = new() { "FA-26B",    "F-45A",     "AH-94",     "T-55",      "EF-24",
+                                                            "ASF-30/33", "ASF-58",    "SAM SA",    "AWACS",     "EW Rdr",
         private readonly Dictionary<string, float> _RCS1Range = new() { { "FA-26B",    04.27f },
                                                                         { "AV-42",     00.00f },
                                                                         { "F-45A",     04.68f },
@@ -162,6 +164,7 @@ namespace DetectionRangeEstimation
                 _recalcNeeded = false;
                 CalcDtctnDist();
                 // update page text with event
+                UpdateUI();
             }
         }
 
@@ -399,13 +402,66 @@ namespace DetectionRangeEstimation
 
             if (mfdMngr)
             {
+                distPgInstance.GetComponent<MFDPage>().buttons[0].OnPress.AddListener(OnDecrementRdr);
+                distPgInstance.GetComponent<MFDPage>().buttons[1].OnPress.AddListener(OnIncrementRdr);
+                _isPortal = false;
                 mfdMngr.pagesDic = null;
                 mfdMngr.EnsureReady();
             }
             else if (mfdPMngr)
             {
+                distPortPgInstance.transform.Find("tempMask/rdeDisplay/ButtonLeft").GetComponent<VRInteractable>().OnInteract.AddListener(OnDecrementRdr);
+                distPortPgInstance.transform.Find("tempMask/rdeDisplay/ButtonRight").GetComponent<VRInteractable>().OnInteract.AddListener(OnIncrementRdr);
+                _isPortal = true;
                 mfdPMngr.pages.Add(distPortPgInstance.GetComponent<MFDPortalPage>());
                 mfdPMngr.Start(); // Might not work since it's meant to be a private method
+            }
+        }
+        private void OnDecrementRdr()
+        {
+            currentRdr--;
+            CorrectIndex();
+            UpdateUI();
+        }
+        private void OnIncrementRdr()
+        {
+            currentRdr++;
+            CorrectIndex();
+            UpdateUI();
+        }
+        private void CorrectIndex()
+        {
+            if (currentRdr < 0)
+            {
+                currentRdr = _detectionRange.Keys.Count - 1;
+            }
+            if (currentRdr >= _detectionRange.Keys.Count)
+            {
+                currentRdr = 0;
+            }
+        }
+        public void UpdateUI()
+        {
+            string radarName = _radarNames[currentRdr];
+            if (!_isPortal)
+            {
+                Text rdrNameText = distPgInstance.transform.Find("RadarName/Opfor Name").GetComponent<Text>();
+                rdrNameText.text = radarName;
+                for (int i = 0; i < 6; i++) 
+                { 
+                    Text distText = distPgInstance.transform.Find($"Direction {i}/DetectDistText").GetComponent<Text>();
+                    distText.text = _detectionRange[radarName][i].ToString("0.00") + "nm";
+                }
+            }
+            if (_isPortal)
+            {
+                Text rdrNameText = distPortPgInstance.transform.Find("tempMask/rdeDisplay/OpforRadarIndic/OPFORname").GetComponent<Text>();
+                rdrNameText.text = radarName;
+                for (int i = 0; i < 6; i++)
+                {
+                    Text distText = distPortPgInstance.transform.Find($"tempMask/rdeDisplay/Direction {i}/detectDist").GetComponent<Text>();
+                    distText.text = _detectionRange[radarName][i].ToString("0.00") + "nm";
+                }
             }
         }
 
@@ -420,10 +476,5 @@ namespace DetectionRangeEstimation
             TargetManager.instance.OnRegisteredActor -= OnRegisteredActor;
             TargetManager.instance.OnUnregisteredActor -= OnUnregisteredActor;
         }
-    }
-
-    public class TextUpdater : MonoBehaviour
-    {
-        
     }
 }
