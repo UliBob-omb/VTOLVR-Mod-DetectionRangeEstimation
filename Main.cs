@@ -60,17 +60,20 @@ namespace DetectionRangeEstimation
     {
         public string ModFolder;
 
+        // Player Actor
         private Dictionary<string, PilotSave> _pilotSaves = [];
         private static PilotSave _currentPilot = null;
-
         private bool _recalcNeeded = false;
         private Actor _playerActor = null;
         private MFDCommsPage _commsPage = null;
         private int _eqNumToJett = 0;
 
+        // Data
         private List<Vector3> _returnDirections = [];
         private readonly List<string> _radarNames = new() { "FA-26B",    "F-45A",     "AH-94",     "T-55",      "EF-24",
                                                             "ASF-30/33", "ASF-58",    "SAM SA",    "AWACS",     "EW Rdr",
+                                                            "MAD-4",     "NMSSLR",    "Mbl Rdr",   "Cruiser",   "NMSSVrt",
+                                                            "RFrCtrl",   "BFrCtrl",   "AV-42"       };
         private readonly Dictionary<string, float> _RCS1Range = new() { { "FA-26B",    04.27f },
                                                                         { "AV-42",     00.00f },
                                                                         { "F-45A",     04.68f },
@@ -107,9 +110,10 @@ namespace DetectionRangeEstimation
                                                                         { "NMSSVrt",   [0f,0f,0f,0f,0f,0f] },
                                                                         { "RFrCtrl",   [0f,0f,0f,0f,0f,0f] },
                                                                         { "BFrCtrl",   [0f,0f,0f,0f,0f,0f] }};
+
+        // MFD Page/Portal Management
         public int currentRdr = 0;
         private bool _isPortal = false;
-
         public MFDPortalManager mfdPMngr = null;
         public MFDManager mfdMngr = null;
         private AssetBundle MFDpgPrefabRef;
@@ -137,8 +141,6 @@ namespace DetectionRangeEstimation
             SceneManager.sceneLoaded += OnSceneLoaded;
             TargetManager.instance.OnRegisteredActor += OnRegisteredActor;
             TargetManager.instance.OnUnregisteredActor += OnUnregisteredActor;
-
-            
         }
 
         private void Update()
@@ -163,11 +165,11 @@ namespace DetectionRangeEstimation
                 }
                 _recalcNeeded = false;
                 CalcDtctnDist();
-                // update page text with event
                 UpdateUI();
             }
         }
 
+        // Player Actor
         private void OnUnregisteredActor(Actor actor)
         {
             //Log($"Actor unregistered: {actor.name}");
@@ -234,6 +236,7 @@ namespace DetectionRangeEstimation
             }
         }
 
+        // Data update events
         private void OnEndFire()
         {
             Log($"Other weapon fired, recalculation needed.");
@@ -243,9 +246,7 @@ namespace DetectionRangeEstimation
         {
             Log($"First weapon changed event after spawn or rearm, recalculation needed.");
             _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
-
             //InitMFDPage(); // may need to move to actor registration section
-
             _recalcNeeded = true;
         }
         private void OnJettisonedEq(HPEquippable equippable)
@@ -286,6 +287,7 @@ namespace DetectionRangeEstimation
             _recalcNeeded = true;
         }
 
+        // Scene Management
         private void OnSceneLoaded(Scene loadedScene, LoadSceneMode loadMode)
         {
             InitPilots();
@@ -299,6 +301,7 @@ namespace DetectionRangeEstimation
             _recalcNeeded = false;
         }
        
+        //Misc. (but important!)
         public void InitPilots()
         {
             _pilotSaves = PilotSaveManager.pilots;
@@ -344,6 +347,8 @@ namespace DetectionRangeEstimation
             }
             Log($"Detection distance calculations done.");
         }
+
+        // MFD Page/Portal
         private void InitMFDPage()
         {
             if (mfdMngr == null & mfdPMngr == null)
