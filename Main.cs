@@ -13,6 +13,7 @@ using System;
 using UnityEngine.Events;
 using UnityEngine.UI;
 using System.Collections.ObjectModel;
+using static MFD;
 
 /*
  * TODO:
@@ -20,11 +21,10 @@ using System.Collections.ObjectModel;
  * -verify detection range correctness
  * -check if player death creates any bugs
  * -check to see if new readonly on _RCS1Range causes any issues
+ * -check if quicksaves or quickloads create any bugs
+ * -check if saved portal presets create any bugs
  * -display these stats in nm *somewhere* in-game (kneeboard? New MFD screen?)
- * --study MFDs in all planes to determine best approach
  * --display stats in new mfd page, initializing with new gameobject.
- * --be able to config opfor radar
- * --make event for config button press
  */
 
 /* RCS process:
@@ -115,9 +115,12 @@ namespace DetectionRangeEstimation
         public int currentRdr = 0;
         private bool _isPortal = false;
         public MFDPortalManager mfdPMngr = null;
+        public MFDPHome homePortal = null;
         public MFDManager mfdMngr = null;
-        private AssetBundle MFDpgPrefabRef;
-        private AssetBundle MFDPpgPrefabRef;
+        public GameObject homePgInstance = null;
+        public MFDPage homePage = null;
+        private MFDPage.MFDButtonInfo button = new();
+        private AssetBundle _MFDpgPrefabRef;
         public GameObject distPgInstance;
         public GameObject distPortPgInstance;
 
@@ -126,23 +129,22 @@ namespace DetectionRangeEstimation
             ModFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             Log($"Detection Range Estimation Awake at {ModFolder}");
 
-            MFDpgPrefabRef = AssetBundle.LoadFromFile($"{ModFolder}\\rdrdtctdistpage");
-            MFDPpgPrefabRef = AssetBundle.LoadFromFile($"{ModFolder}\\rdrdtctdistportal");
-            if (MFDpgPrefabRef == null)
+            _MFDpgPrefabRef = AssetBundle.LoadFromFile($"{ModFolder}\\rdrdtctdistpage");
+            if (_MFDpgPrefabRef == null)
             {
-                LogError($"MFD Page Prefab could not be loaded!");
+                LogError($"MFD Page/Portal asset bundle could not be loaded!");
             }
-            if (MFDPpgPrefabRef == null)
-            {
-                LogError($"MFD Portal Page Prefab could not be loaded!");
-            }
+
+            //button.label = "DRE";
+            //button.toolTip = "Detection Range Estimation";
+            //button.button = MFD.MFDButtons.L1;
 
             SceneManager.activeSceneChanged += OnSceneChange;
             SceneManager.sceneLoaded += OnSceneLoaded;
             TargetManager.instance.OnRegisteredActor += OnRegisteredActor;
             TargetManager.instance.OnUnregisteredActor += OnUnregisteredActor;
         }
-
+       
         private void Update()
         {
             if (_playerActor == null)
@@ -194,8 +196,10 @@ namespace DetectionRangeEstimation
                 _commsPage.OnRequestingRearming -= OnRearmRequest;
                 _commsPage = null;
 
+                button.OnPress.RemoveAllListeners();
                 mfdPMngr = null;
                 mfdMngr = null;
+                homePage = null;
 
                 _playerActor = null;
                 Log($"...player actor deinitialized.");
@@ -225,14 +229,12 @@ namespace DetectionRangeEstimation
                 _commsPage.OnRequestingRearming += OnRearmRequest;
                 Log($"...Events initialized...");
 
-                mfdPMngr = _playerActor.GetComponentInChildren<MFDPortalManager>();
-                mfdMngr = _playerActor.GetComponentInChildren<MFDManager>();
-                InitMFDPage(); // might work here
-                Log($"...MFD manager found...");
+                //InitMFDPage(); // might work here
+                //Log($"...MFD manager found...");
 
-                _recalcNeeded = true;
+                //_recalcNeeded = true;
                 Log($"...player actor initialization done.");
-                Log($"{_playerActor.actorName} has been registered, recalculation needed.");
+                //Log($"{_playerActor.actorName} has been registered, recalculation needed.");
             }
         }
 
@@ -246,7 +248,7 @@ namespace DetectionRangeEstimation
         {
             Log($"First weapon changed event after spawn or rearm, recalculation needed.");
             _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
-            //InitMFDPage(); // may need to move to actor registration section
+            InitMFDPage(); // moved to Start()
             _recalcNeeded = true;
         }
         private void OnJettisonedEq(HPEquippable equippable)
@@ -273,7 +275,7 @@ namespace DetectionRangeEstimation
         private void OnEndRearm()
         {
             Log($"Rearm Ended.");
-            _commsPage.currentRP.OnEndRearm -= OnEndRearm;
+            //_commsPage.currentRP.OnEndRearm -= OnEndRearm; //Causes a nullref for some reason
             _playerActor.weaponManager.OnWeaponChanged.AddListener(OnWeaponChanged);
         }
         private void OnEquipGBroke(int obj)
@@ -331,10 +333,11 @@ namespace DetectionRangeEstimation
                 return;
             }
 
-            int idx = 0;
+            
             foreach (var item in _RCS1Range)
             {
-                float curDtctRng = 0;
+                float curDtctRng;
+                int idx = 0;
                 foreach (Vector3 direction in _returnDirections)
                 {
                     float rcs = _playerActor.radarCrossSection.GetCrossSection(direction);
@@ -342,8 +345,8 @@ namespace DetectionRangeEstimation
                     float newDtctRng = curDtctRng * Mathf.Sqrt(rcs);
                     _detectionRange[item.Key].AddOrSet(newDtctRng, idx);
                     Log($"Detection range for {item.Key} of {_playerActor.actorName} is {newDtctRng} nm in direction {idx}");
+                    idx++;
                 }
-                idx++;
             }
             Log($"Detection distance calculations done.");
         }
@@ -351,11 +354,8 @@ namespace DetectionRangeEstimation
         // MFD Page/Portal
         private void InitMFDPage()
         {
-            if (mfdMngr == null & mfdPMngr == null)
-            {
-                LogError($"No MFD Manager found in player actor!");
-                return;
-            }
+            mfdMngr = null;
+            mfdPMngr = null;
 
             string actorName = _playerActor.actorName;
             string pilotName = $" ({_currentPilot.pilotName})";
@@ -364,54 +364,93 @@ namespace DetectionRangeEstimation
 
             switch (vehicleName)
             {
-                case "SEVTF":
-                    //F-45
-                    distPortPgInstance = MFDPpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal");
-                    distPortPgInstance.transform.parent = mfdPMngr.transform.Find("poweredObj");
+                case "F-45A":
+                    //F-45A
+                    distPortPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal"));
+                    mfdPMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/touchScreenArea").GetComponentInChildren<MFDPortalManager>();
+                    distPortPgInstance.transform.SetParent(mfdPMngr.transform.Find("poweredObj"));
                     distPortPgInstance.transform.SetAsLastSibling();
                     break;
-                case "FA-26B":
+                case "F/A-26B":
                     //F/A-26B
-                    distPgInstance = MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage");
-                    distPgInstance.transform.parent = mfdMngr.transform;
+                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
+                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeFA26"));
+                    mfdMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
+                    distPgInstance.transform.SetParent(mfdMngr.transform);
                     distPgInstance.transform.SetAsLastSibling();
                     break;
-                case "VTOL4":
+                case "AV-42C":
                     //AV-42C
-                    distPgInstance = MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage");
-                    distPgInstance.transform.parent = mfdMngr.transform;
+                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
+                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeAV42"));
+                    mfdMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
+                    distPgInstance.transform.SetParent(mfdMngr.transform);
                     distPgInstance.transform.SetAsLastSibling();
                     break;
                 case "T-55":
                     //T-55
-                    distPgInstance = MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage");
-                    distPgInstance.transform.parent = mfdMngr.transform;
+                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
+                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeT55"));
+                    mfdMngr = _playerActor.transform.Find($"PassengerOnlyObjs/DashCanvasFront/Dash/MFD1").GetComponentInChildren<MFDManager>();
+                    distPgInstance.transform.SetParent(mfdMngr.transform);
                     distPgInstance.transform.SetAsLastSibling();
                     break;
                 case "AH-94":
                     //AH-94
-                    distPgInstance = MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage");
-                    distPgInstance.transform.parent = mfdMngr.transform;
+                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
+                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeAH94"));
+                    mfdMngr = _playerActor.transform.Find($"PassengerOnlyObjs/DashCanvas/Rear/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
+                    distPgInstance.transform.SetParent(mfdMngr.transform);
                     distPgInstance.transform.SetAsLastSibling();
                     break;
-                case "EF-24":
+                case "EF-24G":
                     //EF-24G
-                    distPortPgInstance = MFDPpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal");
-                    distPortPgInstance.transform.parent = mfdPMngr.transform.Find("poweredObj").Find("-- pages --");
+                    distPortPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal"));
+                    //mfdPMngr = _playerActor.transform.Find($"PassengerOnlyObjs/RearCockpit/DashTransform/touchScreenArea").GetComponentInChildren<MFDPortalManager>();
+                    //mfdPMngr.pages.Add(distPortPgInstance.GetComponent<MFDPortalPage>());
+                    mfdPMngr = _playerActor.transform.Find($"PassengerOnlyObjs/FrontCockpit/touchScreenAreaRear").GetComponentInChildren<MFDPortalManager>();
+                    distPortPgInstance.transform.SetParent(mfdPMngr.transform.Find("poweredObj/-- pages --"));
                     distPortPgInstance.transform.SetAsLastSibling();
                     break;
                 default:
-                    LogError($"Vehicle {_playerActor.name} is not in list of supported vehicles!");
+                    LogError($"Vehicle {vehicleName} is not in list of supported vehicles!");
                     break;
             }
 
+            if (mfdMngr == null && mfdPMngr == null)
+            {
+                LogError($"No MFD Manager found in player actor!");
+                return;
+            }
             if (mfdMngr)
             {
-                distPgInstance.GetComponent<MFDPage>().buttons[0].OnPress.AddListener(OnDecrementRdr);
-                distPgInstance.GetComponent<MFDPage>().buttons[1].OnPress.AddListener(OnIncrementRdr);
-                _isPortal = false;
+                // button & homepage setup
+                homePgInstance.transform.SetParent(mfdMngr.transform);
+                Destroy(mfdMngr.homepagePrefab.gameObject);
+                mfdMngr.homepagePrefab = homePgInstance;
+                mfdMngr.homepagePrefab.name = "MFDHome";
+                MFDPage mfdPg = distPgInstance.GetComponent<MFDPage>();
+                mfdPg.buttons[0].OnPress.AddListener(OnDecrementRdr);
+                mfdPg.buttons[1].OnPress.AddListener(OnIncrementRdr);
+                homePage = mfdMngr.homepagePrefab.GetComponent<MFDPage>();
+                //button.OnPress.AddListener(delegate { homePage.OpenPage(mfdPg.pageName); } );
+                //mfdMngr.homepagePrefab.GetComponent<MFDPage>().buttons.AddItem(button);
+
                 mfdMngr.pagesDic = null;
-                mfdMngr.EnsureReady();
+                mfdMngr.mfdPages = null;
+                mfdMngr.Awake();
+
+                foreach (MFD mfd in mfdMngr.mfds)
+                {
+                    for (int i = 0; i < mfd.buttons.Length; i++)
+                    {
+                        for (int j = 0; j < mfd.buttons[i].transform.childCount; j++)
+                        {
+                            mfd.buttons[i].transform.GetChild(j).gameObject.SetActive(true);
+                        }
+                    }
+                }
+                mfdMngr.Start();
             }
             else if (mfdPMngr)
             {
@@ -419,7 +458,8 @@ namespace DetectionRangeEstimation
                 distPortPgInstance.transform.Find("tempMask/rdeDisplay/ButtonRight").GetComponent<VRInteractable>().OnInteract.AddListener(OnIncrementRdr);
                 _isPortal = true;
                 mfdPMngr.pages.Add(distPortPgInstance.GetComponent<MFDPortalPage>());
-                mfdPMngr.Start(); // Might not work since it's meant to be a private method
+                mfdPMngr.Awake(); // new
+                mfdPMngr.Start(); 
             }
         }
         private void OnDecrementRdr()
@@ -473,8 +513,7 @@ namespace DetectionRangeEstimation
         public override void UnLoad()
         {
             // Destroy any objects
-            MFDpgPrefabRef.Unload(true);
-            MFDPpgPrefabRef.Unload(true);
+            _MFDpgPrefabRef.Unload(true);
 
             SceneManager.activeSceneChanged -= OnSceneChange;
             SceneManager.sceneLoaded -= OnSceneLoaded;
