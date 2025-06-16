@@ -175,7 +175,6 @@ namespace DetectionRangeEstimation
         // Player Actor
         private void OnUnregisteredActor(Actor actor)
         {
-            //Log($"Actor unregistered: {actor.name}");
             if (_currentPilot == null)
             {
                 return;
@@ -209,7 +208,6 @@ namespace DetectionRangeEstimation
         }
         private void OnRegisteredActor(Actor actor)
         {
-            //Log($"Actor registered: {actor.name} with root actor {actor.rootActor.name}");
             if (_currentPilot == null)
             {
                 return;
@@ -273,6 +271,10 @@ namespace DetectionRangeEstimation
             {
                 _eqNumToJett++;
             }
+            else
+            {
+                _eqNumToJett--;
+            }
         }
         private void OnRearmRequest()
         {
@@ -282,7 +284,6 @@ namespace DetectionRangeEstimation
         private void OnEndRearm()
         {
             Log($"Rearm Ended.");
-            //_commsPage.currentRP.OnEndRearm -= OnEndRearm; //Causes a nullref for some reason
             _playerActor.weaponManager.OnWeaponChanged.AddListener(OnWeaponChanged);
         }
         private void OnEquipGBroke(int obj)
@@ -369,60 +370,7 @@ namespace DetectionRangeEstimation
             string vehicleName = actorName.Substring(0, actorName.Length - pilotName.Length);
             Log($"Player's vehicle name is {vehicleName}.");
 
-            switch (vehicleName)
-            {
-                case "F-45A":
-                    //F-45A
-                    distPortPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal"));
-                    mfdPMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/touchScreenArea").GetComponentInChildren<MFDPortalManager>();
-                    distPortPgInstance.transform.SetParent(mfdPMngr.transform.Find("poweredObj"));
-                    distPortPgInstance.transform.SetAsLastSibling();
-                    break;
-                case "F/A-26B":
-                    //F/A-26B
-                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
-                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeFA26"));
-                    mfdMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
-                    distPgInstance.transform.SetParent(mfdMngr.transform);
-                    distPgInstance.transform.SetAsLastSibling();
-                    break;
-                case "AV-42C":
-                    //AV-42C
-                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
-                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeAV42"));
-                    mfdMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
-                    distPgInstance.transform.SetParent(mfdMngr.transform);
-                    distPgInstance.transform.SetAsLastSibling();
-                    break;
-                case "T-55":
-                    //T-55
-                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
-                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeT55"));
-                    mfdMngr = _playerActor.transform.Find($"PassengerOnlyObjs/DashCanvasFront/Dash/MFD1").GetComponentInChildren<MFDManager>();
-                    distPgInstance.transform.SetParent(mfdMngr.transform);
-                    distPgInstance.transform.SetAsLastSibling();
-                    break;
-                case "AH-94":
-                    //AH-94
-                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
-                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeAH94"));
-                    mfdMngr = _playerActor.transform.Find($"PassengerOnlyObjs/DashCanvas/Rear/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
-                    distPgInstance.transform.SetParent(mfdMngr.transform);
-                    distPgInstance.transform.SetAsLastSibling();
-                    break;
-                case "EF-24G":
-                    //EF-24G
-                    distPortPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal"));
-                    //mfdPMngr = _playerActor.transform.Find($"PassengerOnlyObjs/RearCockpit/DashTransform/touchScreenArea").GetComponentInChildren<MFDPortalManager>();
-                    //mfdPMngr.pages.Add(distPortPgInstance.GetComponent<MFDPortalPage>());
-                    mfdPMngr = _playerActor.transform.Find($"PassengerOnlyObjs/FrontCockpit/touchScreenAreaRear").GetComponentInChildren<MFDPortalManager>();
-                    distPortPgInstance.transform.SetParent(mfdPMngr.transform.Find("poweredObj/-- pages --"));
-                    distPortPgInstance.transform.SetAsLastSibling();
-                    break;
-                default:
-                    LogError($"Vehicle {vehicleName} is not in list of supported vehicles!");
-                    break;
-            }
+            InstantiateVehicleAssets(vehicleName);
 
             if (mfdMngr == null && mfdPMngr == null)
             {
@@ -431,22 +379,21 @@ namespace DetectionRangeEstimation
             }
             if (mfdMngr)
             {
-                // button & homepage setup
+                //modified homepage
                 homePgInstance.transform.SetParent(mfdMngr.transform);
                 Destroy(mfdMngr.homepagePrefab.gameObject);
                 mfdMngr.homepagePrefab = homePgInstance;
                 mfdMngr.homepagePrefab.name = "MFDHome";
+                //new page
                 MFDPage mfdPg = distPgInstance.GetComponent<MFDPage>();
                 mfdPg.buttons[0].OnPress.AddListener(OnDecrementRdr);
                 mfdPg.buttons[1].OnPress.AddListener(OnIncrementRdr);
                 homePage = mfdMngr.homepagePrefab.GetComponent<MFDPage>();
-                //button.OnPress.AddListener(delegate { homePage.OpenPage(mfdPg.pageName); } );
-                //mfdMngr.homepagePrefab.GetComponent<MFDPage>().buttons.AddItem(button);
 
                 mfdMngr.pagesDic = null;
                 mfdMngr.mfdPages = null;
                 mfdMngr.Awake();
-
+                // Make sure all button gameobjects are active, so that GetComponent() will resolve.
                 foreach (MFD mfd in mfdMngr.mfds)
                 {
                     for (int i = 0; i < mfd.buttons.Length; i++)
@@ -461,12 +408,64 @@ namespace DetectionRangeEstimation
             }
             else if (mfdPMngr)
             {
+                // may need to create custom home portal?
                 distPortPgInstance.transform.Find("tempMask/rdeDisplay/ButtonLeft").GetComponent<VRInteractable>().OnInteract.AddListener(OnDecrementRdr);
                 distPortPgInstance.transform.Find("tempMask/rdeDisplay/ButtonRight").GetComponent<VRInteractable>().OnInteract.AddListener(OnIncrementRdr);
                 _isPortal = true;
                 mfdPMngr.pages.Add(distPortPgInstance.GetComponent<MFDPortalPage>());
-                mfdPMngr.Awake(); // new
+                mfdPMngr.Awake();
                 mfdPMngr.Start(); 
+            }
+        }
+        private void InstantiateVehicleAssets(string vehicleName)
+        {
+            switch (vehicleName)
+            {
+                case "F-45A":
+                    distPortPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal"));
+                    mfdPMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/touchScreenArea").GetComponentInChildren<MFDPortalManager>();
+                    distPortPgInstance.transform.SetParent(mfdPMngr.transform.Find("poweredObj"));
+                    distPortPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "F/A-26B":
+                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
+                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeFA26"));
+                    mfdMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
+                    distPgInstance.transform.SetParent(mfdMngr.transform);
+                    distPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "AV-42C":
+                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
+                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeAV42"));
+                    mfdMngr = _playerActor.transform.Find($"Local/DashCanvas/Dash/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
+                    distPgInstance.transform.SetParent(mfdMngr.transform);
+                    distPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "T-55":
+                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
+                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeT55"));
+                    mfdMngr = _playerActor.transform.Find($"PassengerOnlyObjs/DashCanvasFront/Dash/MFD1").GetComponentInChildren<MFDManager>();
+                    distPgInstance.transform.SetParent(mfdMngr.transform);
+                    distPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "AH-94":
+                    distPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPage"));
+                    homePgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("MFDHomeAH94"));
+                    mfdMngr = _playerActor.transform.Find($"PassengerOnlyObjs/DashCanvas/Rear/MFD1/MFDMask").GetComponentInChildren<MFDManager>();
+                    distPgInstance.transform.SetParent(mfdMngr.transform);
+                    distPgInstance.transform.SetAsLastSibling();
+                    break;
+                case "EF-24G":
+                    distPortPgInstance = Instantiate(_MFDpgPrefabRef.LoadAsset<GameObject>("RdrDtctDistPortal"));
+                    //mfdPMngr = _playerActor.transform.Find($"PassengerOnlyObjs/RearCockpit/DashTransform/touchScreenArea").GetComponentInChildren<MFDPortalManager>();
+                    //mfdPMngr.pages.Add(distPortPgInstance.GetComponent<MFDPortalPage>());
+                    mfdPMngr = _playerActor.transform.Find($"PassengerOnlyObjs/FrontCockpit/touchScreenAreaRear").GetComponentInChildren<MFDPortalManager>();
+                    distPortPgInstance.transform.SetParent(mfdPMngr.transform.Find("poweredObj/-- pages --"));
+                    distPortPgInstance.transform.SetAsLastSibling();
+                    break;
+                default:
+                    LogError($"Vehicle {vehicleName} is not in list of supported vehicles!");
+                    break;
             }
         }
         private void OnDecrementRdr()
