@@ -114,6 +114,7 @@ namespace DetectionRangeEstimation
         // MFD Page/Portal Management
         public int currentRdr = 0;
         private bool _isPortal = false;
+        private bool _isFirstActorSpawn = true;
         public MFDPortalManager mfdPMngr = null;
         public MFDPHome homePortal = null;
         public MFDManager mfdMngr = null;
@@ -184,6 +185,7 @@ namespace DetectionRangeEstimation
             {
                 Log($"Player actor {_playerActor.actorName} unregistered, deinitializing...");
                 _recalcNeeded = false;
+                _isFirstActorSpawn = true;
 
                 _playerActor.weaponManager.OnEquipGBroke -= OnEquipGBroke;
                 _playerActor.weaponManager.OnFiredMissile -= OnFiredMissile;
@@ -248,7 +250,12 @@ namespace DetectionRangeEstimation
         {
             Log($"First weapon changed event after spawn or rearm, recalculation needed.");
             _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
-            InitMFDPage(); // moved to Start()
+            if (_isFirstActorSpawn)
+            {
+                _isFirstActorSpawn = false;
+                InitMFDPage();
+                UpdateUI();
+            }
             _recalcNeeded = true;
         }
         private void OnJettisonedEq(HPEquippable equippable)
