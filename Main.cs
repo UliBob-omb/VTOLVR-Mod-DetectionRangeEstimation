@@ -16,13 +16,14 @@ using System.Collections.ObjectModel;
 using static MFD;
 
 /*
- * TODO:
+ * Bug Checks:
+ * -check if quicksaves or quickloads create any bugs with vanilla
+ * -check if saved portal presets create any bugs with vanilla
+ *
+ * Polish:
+ * -Change Column Count for EF-24 homepage canvas to 6?
+ * -ensure accurate detection range
  * 
- * -verify detection range correctness
- * -check if player death creates any bugs
- * -check to see if new readonly on _RCS1Range causes any issues
- * -check if quicksaves or quickloads create any bugs
- * -check if saved portal presets create any bugs
  */
 
 /* RCS process:
