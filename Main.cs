@@ -18,11 +18,10 @@ using static MFD;
 /*
  * Bug Checks:
  * -check if quicksaves or quickloads create any bugs with vanilla
- * -check if saved portal presets create any bugs with vanilla
+ * -any issues with players who do not own the DLC?
  *
  * Polish:
- * -Change Column Count for EF-24 homepage canvas to 6?
- * -ensure accurate detection range
+ * -ensure that return directions are correct and accurate
  * 
  */
 
@@ -378,9 +377,11 @@ namespace DetectionRangeEstimation
             }
             if (mfdMngr)
             {
-                //modified homepage
-                homePgInstance.transform.SetParent(mfdMngr.transform);
+                //insert modified homepage, remove & destroy vanilla homepage
+                mfdMngr.homepagePrefab.gameObject.transform.SetParent(null);
+                mfdMngr.homepagePrefab.gameObject.SetActive(false);
                 Destroy(mfdMngr.homepagePrefab.gameObject);
+                homePgInstance.transform.SetParent(mfdMngr.transform);
                 mfdMngr.homepagePrefab = homePgInstance;
                 mfdMngr.homepagePrefab.name = "MFDHome";
                 //new page
@@ -417,6 +418,11 @@ namespace DetectionRangeEstimation
                 mfdPMngr.pages.Add(page);
                 mfdPMngr.Awake();
                 mfdPMngr.homePageTemplate.gameObject.SetActive(true);
+                if (vehicleName == "EF-24G") // change menu item template height on EF-24G only
+                {
+                    mfdPMngr.homePageTemplate.menuItemTemplate.SetActive(true);
+                    mfdPMngr.homePageTemplate.menuItemTemplate.GetComponent<RectTransform>().sizeDelta = new Vector2(52f, 30f);
+                }
                 mfdPMngr.Start();
                 //add new page to rear mfd portal manager EF-24G
                 if (vehicleName == "EF-24G")
@@ -425,13 +431,14 @@ namespace DetectionRangeEstimation
                     mfdPMngr.pages.Add(page);
                     mfdPMngr.Awake();
                     mfdPMngr.homePageTemplate.gameObject.SetActive(true);
+                    mfdPMngr.homePageTemplate.menuItemTemplate.SetActive(true);
+                    mfdPMngr.homePageTemplate.menuItemTemplate.GetComponent<RectTransform>().sizeDelta = new Vector2(52f, 30f);
                     mfdPMngr.Start();
                 }
 
                 _isPortal = true;
             }
         }
-
         private void InstantiateVehicleAssets(string vehicleName)
         {
             switch (vehicleName)
