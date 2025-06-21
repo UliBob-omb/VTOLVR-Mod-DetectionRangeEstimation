@@ -257,9 +257,10 @@ namespace DetectionRangeEstimation
         private void OnJettisonedEq(HPEquippable equippable)
         {
             _eqNumToJett--;
-            if (_eqNumToJett == 0)
+            if (_eqNumToJett <= 0)
             {
                 Log($"Equipment jettisoned, recalculation needed.");
+                _eqNumToJett = 0;
                 _recalcNeeded = true;
             }
         }
