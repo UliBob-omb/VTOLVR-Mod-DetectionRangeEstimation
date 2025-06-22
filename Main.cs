@@ -118,7 +118,6 @@ namespace DetectionRangeEstimation
         public MFDManager mfdMngr = null;
         public GameObject homePgInstance = null;
         public MFDPage homePage = null;
-        private MFDPage.MFDButtonInfo button = new();
         private AssetBundle _MFDpgPrefabRef;
         public GameObject distPgInstance;
         public GameObject distPortPgInstance;
@@ -133,10 +132,6 @@ namespace DetectionRangeEstimation
             {
                 LogError($"MFD Page/Portal asset bundle could not be loaded!");
             }
-
-            //button.label = "DRE";
-            //button.toolTip = "Detection Range Estimation";
-            //button.button = MFD.MFDButtons.L1;
 
             SceneManager.activeSceneChanged += OnSceneChange;
             SceneManager.sceneLoaded += OnSceneLoaded;
@@ -195,7 +190,6 @@ namespace DetectionRangeEstimation
                 _commsPage.OnRequestingRearming -= OnRearmRequest;
                 _commsPage = null;
 
-                button.OnPress.RemoveAllListeners();
                 mfdPMngr = null;
                 mfdMngr = null;
                 homePage = null;
@@ -404,8 +398,23 @@ namespace DetectionRangeEstimation
                             mfd.buttons[i].transform.GetChild(j).gameObject.SetActive(true);
                         }
                     }
+                    mfd.homePage = Instantiate(mfdMngr.homepagePrefab).GetComponent<MFDPage>();
+                    homePage.sortedIndex = -1;
+                    mfd.manager = mfdMngr;
+                    mfd.ClearButtons();
+                    if (!mfd.quickloaded)
+                    {
+                        mfd.GoHome();
+                    }
+                    else
+                    {
+                        mfd.OpenPage(mfd.quickLoadedPage);
+                    }
+
+                    mfd.displayObject.SetActive(mfd.powerOn);
                 }
-                mfdMngr.Start();
+                homePage.gameObject.SetActive(false);
+                
                 _isPortal = false;
             }
             else if (mfdPMngr)
