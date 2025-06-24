@@ -6,14 +6,8 @@ using System.IO;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using HarmonyLib;
-using System.Runtime.CompilerServices;
-using System.Diagnostics.Eventing.Reader;
-using System;
-using UnityEngine.Events;
 using UnityEngine.UI;
-using System.Collections.ObjectModel;
-using static MFD;
+using VTOLVR.Multiplayer;
 
 /*
  * Bug Checks:
@@ -145,6 +139,13 @@ namespace DetectionRangeEstimation
             {
                 return;
             }
+            if (_isFirstActorSpawn)
+            {
+                _isFirstActorSpawn = false;
+                InitMFDPage();
+                //UpdateUI();
+                _recalcNeeded = true;
+            }
             Transform transformRF = _playerActor.myTransform;
             Vector3 fwdVec = transformRF.forward.normalized;
             Vector3 upVec = transformRF.up.normalized;
@@ -173,7 +174,7 @@ namespace DetectionRangeEstimation
                 return;
             }
 
-            if (actor.actorName.EndsWith($"({_currentPilot.pilotName})"))
+            if (_playerActor == actor)
             {
                 Log($"Player actor {_playerActor.actorName} unregistered, deinitializing...");
                 _recalcNeeded = false;
@@ -183,7 +184,7 @@ namespace DetectionRangeEstimation
                 _playerActor.weaponManager.OnFiredMissile -= OnFiredMissile;
                 _playerActor.weaponManager.OnJettisonedEq -= OnJettisonedEq;
                 _playerActor.weaponManager.OnEquipJettisonChanged -= OnEquipJettisonChanged;
-                if(_playerActor.weaponManager.OnWeaponChanged.HasListeners())
+                if (_playerActor.weaponManager.OnWeaponChanged.HasListeners())
                     _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
                 _playerActor.weaponManager.OnEndFire -= OnEndFire;
 
@@ -197,6 +198,18 @@ namespace DetectionRangeEstimation
                 _playerActor = null;
                 Log($"...player actor deinitialized.");
             }
+            else if (_playerActor == null)
+            {
+                Log($"Player actor 'unknown' unregistered, deinitializing...");
+                _recalcNeeded = false;
+                _isFirstActorSpawn = true;
+                _commsPage = null;
+                mfdPMngr = null;
+                mfdMngr = null;
+                homePage = null;
+            }
+
+            //if (actor.actorName.EndsWith($"({_currentPilot.pilotName})") || actor.actorName == _currentPilot.pilotName)
         }
         private void OnRegisteredActor(Actor actor)
         {
@@ -204,11 +217,17 @@ namespace DetectionRangeEstimation
             {
                 return;
             }
-
-            if (actor.actorName.EndsWith($"({_currentPilot.pilotName})"))
+            if (_playerActor != null)
             {
-                Log($"{actor.actorName} is player {_currentPilot.pilotName}, initializing...");
-                _playerActor = actor;
+                return;
+            }
+
+            //Log($"{actor.actorName} has been registered. Gameobject name: {actor.name}");
+            _playerActor = ObtainPlayerObj().GetComponent<Actor>();
+            if (_playerActor != null)
+            {
+                Log($"{_playerActor.name} is player {_currentPilot.pilotName}, initializing...");
+                //_playerActor = actor;
 
                 _playerActor.weaponManager.OnJettisonedEq += OnJettisonedEq;
                 _playerActor.weaponManager.OnEquipJettisonChanged += OnEquipJettisonChanged;
@@ -226,10 +245,19 @@ namespace DetectionRangeEstimation
 
                 //_recalcNeeded = true;
                 Log($"...player actor initialization done.");
-                //Log($"{_playerActor.actorName} has been registered, recalculation needed.");
             }
-        }
 
+            //if (actor.actorName.EndsWith($"({_currentPilot.pilotName})") || actor.actorName == _currentPilot.pilotName)
+        }
+        private GameObject ObtainPlayerObj()
+        {
+            if (VTOLMPUtils.IsMultiplayer())
+            {
+                return VTOLMPLobbyManager.localPlayerInfo.vehicleObject;
+            }
+
+            return FlightSceneManager.instance?.playerActor != null ? FlightSceneManager.instance.playerActor.gameObject : null;
+        }
         // Data update events
         private void OnEndFire()
         {
@@ -240,12 +268,12 @@ namespace DetectionRangeEstimation
         {
             Log($"First weapon changed event after spawn or rearm, recalculation needed.");
             _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
-            if (_isFirstActorSpawn)
+            /*if (_isFirstActorSpawn)
             {
                 _isFirstActorSpawn = false;
                 InitMFDPage();
                 UpdateUI();
-            }
+            }*/
             _recalcNeeded = true;
         }
         private void OnJettisonedEq(HPEquippable equippable)
@@ -345,7 +373,7 @@ namespace DetectionRangeEstimation
                     curDtctRng = item.Value;
                     float newDtctRng = curDtctRng * Mathf.Sqrt(rcs);
                     _detectionRange[item.Key].AddOrSet(newDtctRng, idx);
-                    Log($"Detection range for {item.Key} of {_playerActor.actorName} is {newDtctRng} nm in direction {idx}");
+                    //Log($"Detection range for {item.Key} of {_playerActor.actorName} is {newDtctRng} nm in direction {idx}");
                     idx++;
                 }
             }
@@ -358,18 +386,17 @@ namespace DetectionRangeEstimation
             mfdMngr = null;
             mfdPMngr = null;
 
-            string actorName = _playerActor.actorName;
-            string pilotName = $" ({_currentPilot.pilotName})";
-            string vehicleName = actorName.Substring(0, actorName.Length - pilotName.Length);
+            string vehicleName = PilotSaveManager.currentVehicle.vehicleName;
             Log($"Player's vehicle name is {vehicleName}.");
 
             InstantiateVehicleAssets(vehicleName);
-
             if (mfdMngr == null && mfdPMngr == null)
             {
                 LogError($"No MFD Manager found in player actor!");
                 return;
             }
+            Log($"MFD manager found");
+
             if (mfdMngr)
             {
                 //insert modified homepage, remove & destroy vanilla homepage
