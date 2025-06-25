@@ -139,12 +139,12 @@ namespace DetectionRangeEstimation
             {
                 return;
             }
-            if (_isFirstActorSpawn)
+            if (_isFirstActorSpawn && FlightSceneManager.isFlightReady)
             {
                 _isFirstActorSpawn = false;
                 InitMFDPage();
-                //UpdateUI();
                 _recalcNeeded = true;
+                return; // To mitigate race condition?
             }
             Transform transformRF = _playerActor.myTransform;
             Vector3 fwdVec = transformRF.forward.normalized;
@@ -153,7 +153,7 @@ namespace DetectionRangeEstimation
             _returnDirections = [-fwdVec, fwdVec, -rightVec, rightVec, -upVec, upVec];
             //    Incoming from:  front,  behind,  right,    left,      above, below  all in local space.
             
-            if ((FlightSceneManager.isFlightReady && _recalcNeeded))
+            if (FlightSceneManager.isFlightReady && _recalcNeeded)
             {
                 if (_playerActor.weaponManager == null)
                 {
@@ -198,18 +198,6 @@ namespace DetectionRangeEstimation
                 _playerActor = null;
                 Log($"...player actor deinitialized.");
             }
-            else if (_playerActor == null)
-            {
-                Log($"Player actor 'unknown' unregistered, deinitializing...");
-                _recalcNeeded = false;
-                _isFirstActorSpawn = true;
-                _commsPage = null;
-                mfdPMngr = null;
-                mfdMngr = null;
-                homePage = null;
-            }
-
-            //if (actor.actorName.EndsWith($"({_currentPilot.pilotName})") || actor.actorName == _currentPilot.pilotName)
         }
         private void OnRegisteredActor(Actor actor)
         {
@@ -222,8 +210,13 @@ namespace DetectionRangeEstimation
                 return;
             }
 
-            //Log($"{actor.actorName} has been registered. Gameobject name: {actor.name}");
-            _playerActor = ObtainPlayerObj().GetComponent<Actor>();
+            GameObject playerObj = ObtainPlayerObj();
+            if (playerObj == null)
+            {
+                return;
+            }
+
+            _playerActor = playerObj?.GetComponent<Actor>();
             if (_playerActor != null)
             {
                 Log($"{_playerActor.name} is player {_currentPilot.pilotName}, initializing...");
@@ -268,13 +261,10 @@ namespace DetectionRangeEstimation
         {
             Log($"First weapon changed event after spawn or rearm, recalculation needed.");
             _playerActor.weaponManager.OnWeaponChanged.RemoveListener(OnWeaponChanged);
-            /*if (_isFirstActorSpawn)
+            if (!_isFirstActorSpawn)
             {
-                _isFirstActorSpawn = false;
-                InitMFDPage();
-                UpdateUI();
-            }*/
-            _recalcNeeded = true;
+                _recalcNeeded = true;
+            }
         }
         private void OnJettisonedEq(HPEquippable equippable)
         {
